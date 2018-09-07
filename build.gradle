@@ -14,53 +14,94 @@
  * the License.
  */
 
-apply from: project.file('gradle.gradle')
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.14.1'
+}
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath(group: 'org.jfrog.buildinfo', name: 'build-info-extractor-gradle', version: '4.+')
+    }
+}
 
 allprojects {
-  group="org.ros.rosjava_bootstrap"
-  version = "0.3.0"
+    group = "org.ros.rosjava_bootstrap"
+    version = "0.3.2"
+
+    repositories {
+        maven {
+            url "http://10.0.1.13:8081/artifactory/jcenter"
+        }
+    }
 }
 
 subprojects {
-  apply plugin: 'java'
-  apply plugin: 'maven'
-  apply plugin: 'maven-publish'
-  apply plugin: "idea"
-  apply plugin: "eclipse"
+    apply plugin: 'java'
+    apply plugin: 'maven'
+    apply plugin: 'maven-publish'
+    apply plugin: "idea"
+    apply plugin: "eclipse"
+    apply plugin: "com.jfrog.artifactory"
 
-  sourceCompatibility = 1.6
-  targetCompatibility = 1.6
+    //sourceCompatibility = 1.6
+    //targetCompatibility = 1.6
 
-  // These external repositories are copied from bootstrap.gradle.
-  repositories {
-    jcenter()
-    maven {
-      url "http://repository.springsource.com/maven/bundles/release"
-    }
-    maven {
-      url "http://repository.springsource.com/maven/bundles/external"
-    }
-  }
-
-  // Configuration of the deployment repository is copied from the RosPlugin.
-  String mavenDeploymentRepository = System.getenv("ROS_MAVEN_DEPLOYMENT_REPOSITORY")
-  if (mavenDeploymentRepository != null &&
-      mavenDeploymentRepository != "") {
-    publishing {
-      publications {
-        mavenJava(MavenPublication) {
-          from components.java
-        }
-      }
-      repositories {
+    // These external repositories are copied from bootstrap.gradle.
+    repositories {
+        jcenter()
         maven {
-           url 'file://' + mavenDeploymentRepository
+            url "http://repository.springsource.com/maven/bundles/release"
         }
-      }
+        maven {
+            url "http://repository.springsource.com/maven/bundles/external"
+        }
     }
-  } else {
-    logger.warn("ROS_MAVEN_DEPLOYMENT_REPOSITORY is not set. Have you sourced setup.bash?")
-  }
+
+    // Configuration of the deployment repository is copied from the RosPlugin.
+    String mavenDeploymentRepository = System.getenv("ROS_MAVEN_DEPLOYMENT_REPOSITORY")
+    if (mavenDeploymentRepository != null &&
+            mavenDeploymentRepository != "") {
+        publishing {
+            publications {
+                mavenJava(MavenPublication) {
+                    from components.java
+                }
+            }
+        }
+        artifactoryPublish {
+            publications(publishing.publications.mavenJava)
+        }
+    } else {
+        logger.warn("ROS_MAVEN_DEPLOYMENT_REPOSITORY is not set. Have you sourced setup.bash?")
+    }
+}
+
+artifactoryPublish.skip = true
+
+artifactory {
+    contextUrl = "${artifactory_contextUrl}"
+    //The base Artifactory URL if not overridden by the publisher/resolver
+    publish {
+        repository {
+            repoKey = 'gradle-dev-local'
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+
+        }
+    }
+    resolve {
+        repository {
+            repoKey = 'gradle-dev'
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+
+        }
+    }
 }
 
 defaultTasks 'publish', 'installDist'
